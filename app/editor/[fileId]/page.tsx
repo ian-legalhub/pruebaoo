@@ -6,6 +6,7 @@ import { FileService } from '../../lib/file-service';
 import { OnlyOfficeConfig } from '../../types/file';
 import { CollaborationService } from '../../lib/collaboration-service';
 import { ArrowLeft, Loader2, AlertCircle } from 'lucide-react';
+import PlaceholderPanel from '../../components/placeholder-panel';
 
 declare global {
   interface Window {
@@ -62,6 +63,8 @@ export default function EditorPage({ params }: { params: Promise<{ fileId: strin
   const [isLoading, setIsLoading] = useState(true);
   const [editorInstance, setEditorInstance] = useState<any>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [isEditorReady, setIsEditorReady] = useState(false);
+  const [isDocumentReady, setIsDocumentReady] = useState(false);
 
   const editorRef = useRef<HTMLDivElement>(null);
   const scriptLoadedRef = useRef(false);
@@ -167,10 +170,21 @@ export default function EditorPage({ params }: { params: Promise<{ fileId: strin
     const editorConfigObj = {
       ...editorConfig.config,
       events: {
-        onAppReady: () => console.log('OnlyOffice editor ready'),
+        onAppReady: () => {
+          console.log('OnlyOffice editor ready');
+          setIsEditorReady(true);
+        },
+        onDocumentReady: () => {
+          console.log('OnlyOffice document ready');
+          setIsDocumentReady(true);
+        },
         onDocumentStateChange: (event: any) =>
           console.log('Document state changed:', event.data),
-        onError: (event: any) => handleError('Error en el editor OnlyOffice', event.data),
+        onError: (event: any) => {
+          handleError('Error en el editor OnlyOffice', event.data);
+          setIsEditorReady(false);
+          setIsDocumentReady(false);
+        },
         onInfo: (event: any) => console.log('OnlyOffice info:', event.data),
       },
     };
@@ -246,13 +260,20 @@ export default function EditorPage({ params }: { params: Promise<{ fileId: strin
         </div>
       </header>
 
-      <main className="flex-1">
-        <div
-          id="onlyoffice-editor"
-          ref={editorRef}
-          className="w-full h-full"
-          style={{ height: 'calc(100vh - 64px)' }}
+      <main className="flex-1 flex overflow-hidden">
+        <PlaceholderPanel
+          editorInstance={editorInstance}
+          isEditorReady={isEditorReady && isDocumentReady}
+          isReadOnly={config?.readOnly || config?.isHistoricalVersion || config?.isComparison || mode === 'view'}
         />
+        <div className="flex-1 overflow-hidden">
+          <div
+            id="onlyoffice-editor"
+            ref={editorRef}
+            className="w-full h-full"
+            style={{ height: 'calc(100vh - 64px)' }}
+          />
+        </div>
       </main>
     </div>
   );
