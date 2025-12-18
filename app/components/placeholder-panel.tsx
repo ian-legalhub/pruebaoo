@@ -12,9 +12,10 @@ interface PlaceholderPanelProps {
   editorInstance: any;
   isEditorReady?: boolean;
   isReadOnly?: boolean;
+  placeholders?: PlaceholderField[];
 }
 
-const PLACEHOLDER_FIELDS: PlaceholderField[] = [
+const DEFAULT_PLACEHOLDER_FIELDS: PlaceholderField[] = [
   { key: 'client_name', label: 'Nombre del Cliente', category: 'Cliente' },
   { key: 'client_email', label: 'Email del Cliente', category: 'Cliente' },
   { key: 'client_phone', label: 'Teléfono del Cliente', category: 'Cliente' },
@@ -77,7 +78,12 @@ const insertPlaceholder = (editorInstance: any, fieldKey: string, isEditorReady:
   }
 };
 
-export default function PlaceholderPanel({ editorInstance, isEditorReady = false, isReadOnly = false }: PlaceholderPanelProps) {
+export default function PlaceholderPanel({
+  editorInstance,
+  isEditorReady = false,
+  isReadOnly = false,
+  placeholders,
+}: PlaceholderPanelProps) {
   const handleFieldClick = (fieldKey: string) => {
     if (isReadOnly) {
       return;
@@ -89,7 +95,9 @@ export default function PlaceholderPanel({ editorInstance, isEditorReady = false
     }
   };
 
-  const fieldsByCategory = PLACEHOLDER_FIELDS.reduce((acc, field) => {
+  const sourceFields = (placeholders && placeholders.length > 0) ? placeholders : DEFAULT_PLACEHOLDER_FIELDS;
+
+  const fieldsByCategory = sourceFields.reduce((acc, field) => {
     const category = field.category || 'Otros';
     if (!acc[category]) {
       acc[category] = [];

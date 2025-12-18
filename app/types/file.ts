@@ -21,6 +21,7 @@ export interface FileListResponse {
 }
 
 export interface UploadFileMetadata {
+  isTemplate?: boolean;
   isContract?: boolean;
   contractId?: string;
   isPublic?: boolean;

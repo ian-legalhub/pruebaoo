@@ -11,12 +11,13 @@ import { TenantConfig } from '../components/tenant-config';
 import { ErrorDisplay } from './error-display';
 import { FileVersionsModal } from '../components/file-versions-modal';
 import { DuplicateFileModal } from '../components/duplicate-file-modal';
-import { 
-  Upload, 
-  LogOut, 
-  RefreshCw, 
+import {
+  Upload,
+  LogOut,
+  RefreshCw,
   Loader2,
-  FolderOpen
+  FolderOpen,
+  FileText,
 } from 'lucide-react';
 
 export default function DashboardPage() {
@@ -152,16 +153,25 @@ export default function DashboardPage() {
             </p>
           </div>
 
-          <button
-            onClick={() => setIsUploadModalOpen(true)}
-            className="flex items-center gap-2 px-6 py-3 text-white rounded-lg font-medium transition-all"
-            style={{ backgroundColor: '#540c97' }}
-            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#6b0ec4'}
-            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#540c97'}
-          >
-            <Upload className="w-5 h-5" />
-            Subir Archivo
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => (window.location.href = '/contracts/templates/new')}
+              className="flex items-center gap-2 px-4 py-3 border border-zinc-300 dark:border-zinc-600 rounded-lg font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-sm"
+            >
+              <FileText className="w-5 h-5" />
+              Configurar plantillas
+            </button>
+            <button
+              onClick={() => setIsUploadModalOpen(true)}
+              className="flex items-center gap-2 px-6 py-3 text-white rounded-lg font-medium transition-all"
+              style={{ backgroundColor: '#540c97' }}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#6b0ec4')}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#540c97')}
+            >
+              <Upload className="w-5 h-5" />
+              Subir Archivo
+            </button>
+          </div>
         </div>
 
         <div className="bg-white dark:bg-zinc-800 rounded-2xl shadow-xl border border-zinc-200 dark:border-zinc-700 p-6">

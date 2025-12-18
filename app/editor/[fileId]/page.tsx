@@ -7,6 +7,8 @@ import { OnlyOfficeConfig } from '../../types/file';
 import { CollaborationService } from '../../lib/collaboration-service';
 import { ArrowLeft, Loader2, AlertCircle } from 'lucide-react';
 import PlaceholderPanel from '../../components/placeholder-panel';
+import { ContractsFormsService } from '../../lib/contracts-forms-service';
+import { build_placeholders_from_form } from '../../lib/placeholders';
 
 declare global {
   interface Window {
@@ -65,6 +67,9 @@ export default function EditorPage({ params }: { params: Promise<{ fileId: strin
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [isEditorReady, setIsEditorReady] = useState(false);
   const [isDocumentReady, setIsDocumentReady] = useState(false);
+  const [contractPlaceholders, setContractPlaceholders] = useState<
+    { key: string; label: string; category?: string }[]
+  >([]);
 
   const editorRef = useRef<HTMLDivElement>(null);
   const scriptLoadedRef = useRef(false);
@@ -92,9 +97,10 @@ export default function EditorPage({ params }: { params: Promise<{ fileId: strin
     version: searchParams.get('version'),
     v1: searchParams.get('v1'),
     v2: searchParams.get('v2'),
+    contractsFormId: searchParams.get('contractsFormId'),
   });
 
-  const { mode, version, v1, v2 } = getEditorParams();
+  const { mode, version, v1, v2, contractsFormId } = getEditorParams();
 
   useEffect(() => {
     load_editor_config();
@@ -102,6 +108,26 @@ export default function EditorPage({ params }: { params: Promise<{ fileId: strin
       cleanup();
     };
   }, [fileId, mode, version, v1, v2]);
+
+  useEffect(() => {
+    const load_contract_placeholders = async () => {
+      if (!contractsFormId) {
+        setContractPlaceholders([]);
+        return;
+      }
+
+      try {
+        const form = await ContractsFormsService.get_form(contractsFormId);
+        const dynamicPlaceholders = build_placeholders_from_form(form.form || []);
+        setContractPlaceholders(dynamicPlaceholders);
+      } catch (err) {
+        console.error('Error al cargar placeholders del formulario de contrato:', err);
+        setContractPlaceholders([]);
+      }
+    };
+
+    load_contract_placeholders();
+  }, [contractsFormId]);
 
   // Cargar configuración del editor
   const load_editor_config = async () => {
@@ -265,6 +291,7 @@ export default function EditorPage({ params }: { params: Promise<{ fileId: strin
           editorInstance={editorInstance}
           isEditorReady={isEditorReady && isDocumentReady}
           isReadOnly={config?.readOnly || config?.isHistoricalVersion || config?.isComparison || mode === 'view'}
+          placeholders={contractPlaceholders}
         />
         <div className="flex-1 overflow-hidden">
           <div

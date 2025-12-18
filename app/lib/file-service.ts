@@ -6,6 +6,9 @@ export class FileService {
     const formData = new FormData();
     formData.append('file', file);
     
+    if (metadata?.isTemplate !== undefined) {
+      formData.append('isTemplate', String(metadata.isTemplate));
+    }
     if (metadata?.isContract) {
       formData.append('isContract', String(metadata.isContract));
     }
@@ -22,6 +25,17 @@ export class FileService {
       },
     });
 
+    return response.data;
+  }
+
+  static async create_blank_file(payload: {
+    fileName: string;
+    isTemplate?: boolean;
+    isContract?: boolean;
+    contractId?: string;
+    isPublic?: boolean;
+  }): Promise<FileMetadata> {
+    const response = await files_api.post('/files/create-blank', payload);
     return response.data;
   }
 
