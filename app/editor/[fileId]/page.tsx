@@ -73,6 +73,10 @@ export default function EditorPage({ params }: { params: Promise<{ fileId: strin
 
   const editorRef = useRef<HTMLDivElement>(null);
   const scriptLoadedRef = useRef(false);
+  const isInitializingRef = useRef(false);
+  const currentConfigRef = useRef<string | null>(null);
+  const editorInstanceRef = useRef<any>(null);
+  const isRefreshingRef = useRef(false);
 
   // Helper para manejo de errores de manera centralizada
   const handleError = (msg: string, err?: any) => {
@@ -82,12 +86,14 @@ export default function EditorPage({ params }: { params: Promise<{ fileId: strin
 
   // Helper seguro para destruir editor
   const destroyEditorSafe = () => {
-    if (editorInstance) {
+    const instance = editorInstanceRef.current || editorInstance;
+    if (instance) {
       try {
-        editorInstance.destroyEditor();
+        instance.destroyEditor();
       } catch (err) {
         console.error('Error destroying editor:', err);
       }
+      editorInstanceRef.current = null;
     }
   };
 
@@ -168,8 +174,27 @@ export default function EditorPage({ params }: { params: Promise<{ fileId: strin
 
   // Cargar script de OnlyOffice dinámicamente
   const load_onlyoffice_script = (editorApiUrl: string, editorConfig: OnlyOfficeConfig) => {
+    // Crear una clave única para esta configuración
+    const configKey = JSON.stringify({
+      fileId,
+      key: editorConfig.config?.document?.key,
+      mode,
+      version,
+      v1,
+      v2,
+    });
+
+    // Si ya estamos inicializando con la misma configuración, ignorar
+    if (isInitializingRef.current && currentConfigRef.current === configKey) {
+      return;
+    }
+
+    // Si el script ya está cargado y la configuración es la misma, solo inicializar
     if (scriptLoadedRef.current) {
-      initialize_editor(editorConfig);
+      if (currentConfigRef.current === configKey) {
+        return; // Ya está inicializado con esta configuración
+      }
+      initialize_editor(editorConfig, configKey);
       return;
     }
 
@@ -179,7 +204,7 @@ export default function EditorPage({ params }: { params: Promise<{ fileId: strin
 
     script.onload = () => {
       scriptLoadedRef.current = true;
-      initialize_editor(editorConfig);
+      initialize_editor(editorConfig, configKey);
     };
 
     script.onerror = () => handleError('Error al cargar el script de OnlyOffice');
@@ -188,9 +213,20 @@ export default function EditorPage({ params }: { params: Promise<{ fileId: strin
   };
 
   // Inicializar editor OnlyOffice
-  const initialize_editor = (editorConfig: OnlyOfficeConfig) => {
+  const initialize_editor = (editorConfig: OnlyOfficeConfig, configKey: string) => {
     if (!editorRef.current || !window.DocsAPI) return;
 
+    // Prevenir múltiples inicializaciones simultáneas
+    if (isInitializingRef.current) {
+      console.warn('Editor initialization already in progress, skipping...');
+      return;
+    }
+
+    if (currentConfigRef.current === configKey && editorInstanceRef.current) {
+      return;
+    }
+
+    isInitializingRef.current = true;
     destroyEditorSafe(); // Destruir editor previo si existe
 
     const editorConfigObj = {
@@ -199,10 +235,16 @@ export default function EditorPage({ params }: { params: Promise<{ fileId: strin
         onAppReady: () => {
           console.log('OnlyOffice editor ready');
           setIsEditorReady(true);
+          isInitializingRef.current = false;
         },
         onDocumentReady: () => {
           console.log('OnlyOffice document ready');
           setIsDocumentReady(true);
+          // Resetear el flag de refresh cuando el documento esté listo
+          if (isRefreshingRef.current) {
+            console.log('OnlyOffice: Document refreshed successfully');
+            isRefreshingRef.current = false;
+          }
         },
         onDocumentStateChange: (event: any) =>
           console.log('Document state changed:', event.data),
@@ -210,22 +252,72 @@ export default function EditorPage({ params }: { params: Promise<{ fileId: strin
           handleError('Error en el editor OnlyOffice', event.data);
           setIsEditorReady(false);
           setIsDocumentReady(false);
+          isInitializingRef.current = false;
         },
         onInfo: (event: any) => console.log('OnlyOffice info:', event.data),
+        onRequestRefreshFile: () => {
+          // Prevenir múltiples llamadas simultáneas
+          if (isRefreshingRef.current) {
+            console.log('OnlyOffice: Refresh already in progress, skipping...');
+            return;
+          }
+
+          console.log('OnlyOffice: File needs to be refreshed');
+          isRefreshingRef.current = true;
+
+          const instance = editorInstanceRef.current;
+          
+          // Intentar usar el método refreshFile si está disponible
+          if (instance && typeof instance.refreshFile === 'function') {
+            try {
+              instance.refreshFile();
+              // El flag se reseteará cuando onDocumentReady se dispare después del refresh
+              // Pero también ponemos un timeout de seguridad más corto
+              setTimeout(() => {
+                if (isRefreshingRef.current) {
+                  console.log('OnlyOffice: Refresh timeout, resetting flag');
+                  isRefreshingRef.current = false;
+                }
+              }, 2000);
+              return; // Salir temprano si refreshFile fue exitoso
+            } catch (err) {
+              console.error('Error calling refreshFile:', err);
+              isRefreshingRef.current = false;
+            }
+          } else {
+            // Si refreshFile no está disponible, recargar la configuración del editor
+            // con una nueva URL que incluya un timestamp para forzar la recarga
+            console.log('OnlyOffice: refreshFile not available, reloading editor config...');
+            isRefreshingRef.current = false;
+            
+            // Recargar la configuración inmediatamente
+            load_editor_config();
+          }
+        },
       },
     };
 
     try {
       const instance = new window.DocsAPI.DocEditor('onlyoffice-editor', editorConfigObj);
       setEditorInstance(instance);
+      editorInstanceRef.current = instance;
+      currentConfigRef.current = configKey;
     } catch (err) {
       handleError('Error al inicializar el editor', err);
+      isInitializingRef.current = false;
+      editorInstanceRef.current = null;
     }
   };
 
   // Limpieza al desmontar
   const cleanup = () => {
     destroyEditorSafe();
+    isInitializingRef.current = false;
+    currentConfigRef.current = null;
+    editorInstanceRef.current = null;
+    isRefreshingRef.current = false;
+    setIsEditorReady(false);
+    setIsDocumentReady(false);
 
     if (sessionId) {
       CollaborationService.end_collaboration(sessionId).catch(console.error);
