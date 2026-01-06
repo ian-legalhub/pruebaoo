@@ -42,9 +42,11 @@ export interface OnlyOfficeConfig {
         fillForms: boolean;
         review: boolean;
       };
-      compareFile?: {
+      compare: {
         fileType: string;
         url: string;
+        key?: string;
+        token?: string;
       };
     };
     documentType: string;

@@ -229,7 +229,8 @@ export default function EditorPage({ params }: { params: Promise<{ fileId: strin
     isInitializingRef.current = true;
     destroyEditorSafe(); // Destruir editor previo si existe
 
-    const editorConfigObj = {
+    // Usar la configuración del backend directamente, solo agregando los eventos
+    const editorConfigObj: any = {
       ...editorConfig.config,
       events: {
         onAppReady: () => {
