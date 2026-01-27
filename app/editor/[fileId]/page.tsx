@@ -106,16 +106,18 @@ export default function EditorPage({ params }: { params: Promise<{ fileId: strin
     contractsFormId: searchParams.get('contractsFormId'),
   });
 
-  const { mode, version, v1, v2, contractsFormId } = getEditorParams();
-
   useEffect(() => {
+    const { mode, version, v1, v2, contractsFormId } = getEditorParams();
+    console.log('URL params changed:', { mode, version, v1, v2, contractsFormId });
+    
     load_editor_config();
     return () => {
       cleanup();
     };
-  }, [fileId, mode, version, v1, v2]);
+  }, [fileId, searchParams]);
 
   useEffect(() => {
+    const { contractsFormId } = getEditorParams();
     const load_contract_placeholders = async () => {
       if (!contractsFormId) {
         setContractPlaceholders([]);
@@ -133,7 +135,7 @@ export default function EditorPage({ params }: { params: Promise<{ fileId: strin
     };
 
     load_contract_placeholders();
-  }, [contractsFormId]);
+  }, [searchParams]);
 
   // Cargar configuración del editor
   const load_editor_config = async () => {
@@ -141,10 +143,55 @@ export default function EditorPage({ params }: { params: Promise<{ fileId: strin
     setError('');
 
     try {
+      const { mode, version, v1, v2 } = getEditorParams();
       let editorConfig: OnlyOfficeConfig;
 
+      console.log('Loading editor config:', { fileId, mode, version, v1, v2 });
+
       if (v1 && v2) {
+        console.log('Comparing versions:', { v1, v2 });
         editorConfig = await FileService.compare_versions(fileId, v1, v2);
+        console.log('Comparison config received:', editorConfig);
+        
+        if (editorConfig.config) {
+          if (editorConfig.config.document) {
+            const versionAnteriorId = typeof v1 === 'string' ? v1 : String(v1);
+            const versionActualId = typeof v2 === 'string' ? v2 : String(v2);
+            const uniqueKey = `${fileId}-${versionActualId}-vs-${versionAnteriorId}-${Date.now()}`;
+            
+
+            
+            console.warn('IMPORTANTE: El token JWT del backend debe tener permisos de edición (edit: true, review: true) para que la comparación funcione. Si el error -23 persiste, el backend necesita generar un token con estos permisos.');
+          }
+          
+          if (editorConfig.config.editorConfig) {
+            editorConfig.config.editorConfig.mode = 'edit';
+            console.log('Set mode to edit');
+            
+            if (editorConfig.config.document?.compareFile?.url) {
+              editorConfig.config.editorConfig.compareUrl = editorConfig.config.document.compareFile.url;
+              console.log('Set compareUrl from compareFile:', editorConfig.config.editorConfig.compareUrl);
+            } else if (editorConfig.config.document?.compare?.url) {
+              editorConfig.config.editorConfig.compareUrl = editorConfig.config.document.compare.url;
+              console.log('Set compareUrl from compare:', editorConfig.config.editorConfig.compareUrl);
+            }
+            
+            if (editorConfig.config.editorConfig.customization) {
+              editorConfig.config.editorConfig.customization.hideReviewDisplay = false;
+              if (!editorConfig.config.editorConfig.customization.review) {
+                editorConfig.config.editorConfig.customization.review = {
+                  showReviewChanges: true,
+                  trackChanges: true
+                };
+              } else {
+                editorConfig.config.editorConfig.customization.review.showReviewChanges = true;
+                editorConfig.config.editorConfig.customization.review.trackChanges = true;
+              }
+              console.log('Updated customization for review:', editorConfig.config.editorConfig.customization);
+            }
+          }
+        }
+        console.log('Final comparison config:', JSON.stringify(editorConfig.config, null, 2));
       } else if (version) {
         editorConfig = await FileService.open_version_in_editor(
           fileId,
@@ -153,7 +200,7 @@ export default function EditorPage({ params }: { params: Promise<{ fileId: strin
       } else {
         editorConfig = await FileService.open_in_editor(
           fileId,
-          mode as 'edit' | 'view'
+          mode as 'review' | 'view'
         );
       }
 
@@ -166,6 +213,7 @@ export default function EditorPage({ params }: { params: Promise<{ fileId: strin
         handleError('No se pudo obtener la URL del editor OnlyOffice');
       }
     } catch (err: any) {
+      console.error('Error loading editor config:', err);
       handleError('Error al cargar el editor', err);
     } finally {
       setIsLoading(false);
@@ -174,15 +222,17 @@ export default function EditorPage({ params }: { params: Promise<{ fileId: strin
 
   // Cargar script de OnlyOffice dinámicamente
   const load_onlyoffice_script = (editorApiUrl: string, editorConfig: OnlyOfficeConfig) => {
-    // Crear una clave única para esta configuración
+    const { mode, version, v1, v2 } = getEditorParams();
+    // Crear una clave única para esta configuración (usar el key modificado)
     const configKey = JSON.stringify({
       fileId,
       key: editorConfig.config?.document?.key,
-      mode,
+      mode: v1 && v2 ? 'compare' : mode,
       version,
       v1,
       v2,
     });
+    console.log('Config key for editor:', configKey);
 
     // Si ya estamos inicializando con la misma configuración, ignorar
     if (isInitializingRef.current && currentConfigRef.current === configKey) {
@@ -230,6 +280,7 @@ export default function EditorPage({ params }: { params: Promise<{ fileId: strin
     destroyEditorSafe(); // Destruir editor previo si existe
 
     // Usar la configuración del backend directamente, solo agregando los eventos
+    console.log('Initializing editor with config:', JSON.stringify(editorConfig.config, null, 2));
     const editorConfigObj: any = {
       ...editorConfig.config,
       events: {
@@ -280,18 +331,16 @@ export default function EditorPage({ params }: { params: Promise<{ fileId: strin
                   isRefreshingRef.current = false;
                 }
               }, 2000);
-              return; // Salir temprano si refreshFile fue exitoso
+              return;
             } catch (err) {
               console.error('Error calling refreshFile:', err);
               isRefreshingRef.current = false;
             }
           } else {
-            // Si refreshFile no está disponible, recargar la configuración del editor
-            // con una nueva URL que incluya un timestamp para forzar la recarga
+
             console.log('OnlyOffice: refreshFile not available, reloading editor config...');
             isRefreshingRef.current = false;
             
-            // Recargar la configuración inmediatamente
             load_editor_config();
           }
         },
@@ -383,7 +432,7 @@ export default function EditorPage({ params }: { params: Promise<{ fileId: strin
         <PlaceholderPanel
           editorInstance={editorInstance}
           isEditorReady={isEditorReady && isDocumentReady}
-          isReadOnly={config?.readOnly || config?.isHistoricalVersion || config?.isComparison || mode === 'view'}
+          isReadOnly={config?.readOnly || config?.isHistoricalVersion || config?.isComparison || getEditorParams().mode === 'view'}
           placeholders={contractPlaceholders}
         />
         <div className="flex-1 overflow-hidden">

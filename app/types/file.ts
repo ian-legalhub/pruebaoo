@@ -42,11 +42,17 @@ export interface OnlyOfficeConfig {
         fillForms: boolean;
         review: boolean;
       };
-      compare: {
+      compare?: {
         fileType: string;
         url: string;
         key?: string;
         token?: string;
+      };
+      info?: {
+        user: {
+          id: string;
+          name: string;
+        };
       };
     };
     documentType: string;
@@ -60,17 +66,29 @@ export interface OnlyOfficeConfig {
       };
       customization: {
         autosave: boolean;
-        chat: boolean;
-        comments: boolean;
-        help: boolean;
+        chat?: boolean;
+        comments?: boolean;
+        help?: boolean;
         hideRightMenu: boolean;
-        hideFileMenu: boolean;
-        logo: string;
+        hideFileMenu?: boolean;
+        logo?: string;
+        forcesave?: boolean;
+        hideRulers?: boolean;
+        hideReviewDisplay?: boolean;
+        review?: {
+          showReviewChanges: boolean;
+          trackChanges?: boolean;
+        };
       };
+      coEditing?: string;
+      compareUrl?: string;
     };
     token: string;
+    height?: string;
+    width?: string;
   };
   editorApiUrl: string;
+  documentServerUrl?: string;
   sessionId?: string;
   fileInfo: {
     id: string;

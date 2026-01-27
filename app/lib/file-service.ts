@@ -86,7 +86,7 @@ export class FileService {
     return response.data.url;
   }
 
-  static async open_in_editor(fileId: string, mode: 'edit' | 'view' = 'edit'): Promise<OnlyOfficeConfig> {
+  static async open_in_editor(fileId: string, mode: 'review' | 'view' = 'review'): Promise<OnlyOfficeConfig> {
     const response = await files_api.get(`/onlyoffice/open-file/${fileId}`, {
       params: { mode }
     });
@@ -108,19 +108,7 @@ export class FileService {
     const revisedVersionNum = typeof revisedVersion === 'string' ? parseInt(revisedVersion, 10) : revisedVersion;
     
     const response = await files_api.get(`/onlyoffice/compare/${fileId}/${originalVersionNum}/${revisedVersionNum}`);
-    const compareConfig = response.data;
     
-    if (!compareConfig.editorApiUrl) {
-      try {
-        const editorConfig = await this.open_in_editor(fileId, 'view');
-        if (editorConfig.editorApiUrl) {
-          compareConfig.editorApiUrl = editorConfig.editorApiUrl;
-        }
-      } catch (error) {
-        console.error('Error al obtener editorApiUrl:', error);
-      }
-    }
-    
-    return compareConfig;
+    return response.data;
   }
 }
